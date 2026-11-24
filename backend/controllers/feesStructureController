@@ -1,0 +1,313 @@
+// const FeesStructure = require("../models/FeesStructure");
+
+// // CREATE a fees structure
+// exports.createFeesStructure = async (req, res) => {
+//   try {
+//     const { className, feeType, amount } = req.body;
+
+//     if (!className || !feeType || amount === undefined || amount === "") {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Please provide class, fee type, and amount.",
+//       });
+//     }
+
+//     const numericAmount = Number(amount);
+
+//     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Amount must be a number greater than zero.",
+//       });
+//     }
+
+//     const feesStructure = await FeesStructure.create({
+//       className,
+//       feeType,
+//       amount: numericAmount,
+//     });
+
+//     res.status(201).json({
+//       success: true,
+//       message: "Fees structure created successfully.",
+//       data: feesStructure,
+//     });
+//   } catch (error) {
+//     console.error("Create Fees Structure Error:", error);
+
+//     res.status(500).json({
+//       success: false,
+//       message: error.message,
+//     });
+//   }
+// };
+
+// // GET all fees structures
+// exports.getAllFeesStructures = async (req, res) => {
+//   try {
+//     const feesStructures = await FeesStructure.find().sort({
+//       createdAt: -1,
+//     });
+
+//     res.status(200).json({
+//       success: true,
+//       count: feesStructures.length,
+//       data: feesStructures,
+//     });
+//   } catch (error) {
+//     console.error("Get Fees Structures Error:", error);
+
+//     res.status(500).json({
+//       success: false,
+//       message: error.message,
+//     });
+//   }
+// };
+
+// // DELETE a fees structure
+// exports.deleteFeesStructure = async (req, res) => {
+//   try {
+//     const feesStructure = await FeesStructure.findByIdAndDelete(
+//       req.params.id
+//     );
+
+//     if (!feesStructure) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Fees structure not found.",
+//       });
+//     }
+
+//     res.status(200).json({
+//       success: true,
+//       message: "Fees structure deleted successfully.",
+//     });
+//   } catch (error) {
+//     console.error("Delete Fees Structure Error:", error);
+
+//     res.status(500).json({
+//       success: false,
+//       message: error.message,
+//     });
+//   }
+// };
+
+
+const FeesStructure = require("../models/FeesStructure");
+
+// CREATE a fees structure
+exports.createFeesStructure = async (req, res) => {
+  try {
+    const { className, section, feeType, amount } = req.body;
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError("");
+    
+        if (
+          !formData.className ||
+          !formData.section ||
+          !formData.feeType ||
+          formData.amount === ""
+        ) {
+          alert("Please fill in all fields.");
+          return;
+        }
+    
+        const numericAmount = Number(formData.amount);
+    
+        if (
+          !Number.isFinite(numericAmount) ||
+          numericAmount <= 0
+        ) {
+          alert("Please enter an amount greater than zero.");
+          return;
+        }
+    
+        // Prepare the exact data sent to the backend.
+        const feeData = {
+          className: normalizeClassName(formData.className),
+          section: formData.section.trim(),
+          feeType: formData.feeType,
+          amount: numericAmount,
+        };
+    
+        // Helpful for debugging.
+        console.log("Submitting fee structure:", feeData);
+    
+        try {
+          setSaving(true);
+    
+          const response = await axios.post(
+            "http://localhost:5000/api/fees-structures",
+            feeData
+          );
+    
+          alert(
+            response.data.message ||
+              "Fee structure added successfully!"
+          );
+    
+          // Clear the form after successful saving.
+          setFormData({
+            className: "",
+            section: "",
+            feeType: "",
+            amount: "",
+          });
+    
+          setSections([]);
+    
+          // Refresh the table with saved MongoDB data.
+          await fetchFees();
+        } catch (err) {
+          console.error(
+            "Error saving fee structure:",
+            err.response?.data || err
+          );
+    
+          alert(
+            err.response?.data?.message ||
+              "Unable to save fee structure. Please check your backend."
+          );
+        } finally {
+          setSaving(false);
+        }
+      };
+    
+
+    // Validate required fields
+    if (
+      !className ||
+      !section ||
+      !feeType ||
+      amount === undefined ||
+      amount === ""
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide class, section, fee type, and amount.",
+      });
+    }
+
+    // Validate fee type
+    const allowedFeeTypes = [
+      "Tuition Fee",
+      "Exam Fee",
+      "Transport Fee",
+    ];
+
+    if (!allowedFeeTypes.includes(feeType)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid fee type.",
+      });
+    }
+
+    // Validate amount
+    const numericAmount = Number(amount);
+
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Amount must be a number greater than zero.",
+      });
+    }
+
+    // Prevent duplicate fees for the same class, section, and fee type
+    const existingFee = await FeesStructure.findOne({
+      className: className.trim(),
+      section: section.trim(),
+      feeType,
+    });
+
+    if (existingFee) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "This fee type already exists for the selected class and section.",
+      });
+    }
+
+    const feesStructure = await FeesStructure.create({
+      className: className.trim(),
+      section: section.trim(),
+      feeType,
+      amount: numericAmount,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Fees structure created successfully.",
+      data: feesStructure,
+    });
+  } catch (error) {
+    console.error("Create Fees Structure Error:", error);
+
+    // Handles duplicate-key errors from the unique index
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "This fee type already exists for the selected class and section.",
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to create fees structure.",
+      error: error.message,
+    });
+  }
+};
+
+// GET all fees structures
+exports.getAllFeesStructures = async (req, res) => {
+  try {
+    const feesStructures = await FeesStructure.find().sort({
+      createdAt: -1,
+    });
+
+    return res.status(200).json({
+      success: true,
+      count: feesStructures.length,
+      data: feesStructures,
+    });
+  } catch (error) {
+    console.error("Get Fees Structures Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to retrieve fees structures.",
+      error: error.message,
+    });
+  }
+};
+
+// DELETE a fees structure
+exports.deleteFeesStructure = async (req, res) => {
+  try {
+    const feesStructure = await FeesStructure.findByIdAndDelete(
+      req.params.id
+    );
+
+    if (!feesStructure) {
+      return res.status(404).json({
+        success: false,
+        message: "Fees structure not found.",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Fees structure deleted successfully.",
+    });
+  } catch (error) {
+    console.error("Delete Fees Structure Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete fees structure.",
+      error: error.message,
+    });
+  }
+};
